@@ -16,10 +16,11 @@ const {
     View,
     ImageBackground,
     ActivityIndicator,
-    NetInfo,
     Platform,
     StyleSheet,
 } = ReactNative;
+
+const NetInfo = require('@react-native-community/netinfo');
 
 const styles = StyleSheet.create({
     image: {
@@ -46,8 +47,6 @@ class CachedImage extends React.Component {
     static propTypes = {
         renderImage: PropTypes.func.isRequired,
         activityIndicatorProps: PropTypes.object.isRequired,
-
-        // ImageCacheManager options
         ...ImageCacheManagerOptionsPropTypes,
     };
 
@@ -72,28 +71,24 @@ class CachedImage extends React.Component {
         this.getImageCacheManagerOptions = this.getImageCacheManagerOptions.bind(this);
         this.getImageCacheManager = this.getImageCacheManager.bind(this);
         this.safeSetState = this.safeSetState.bind(this);
-        this.handleConnectivityChange = this.handleConnectivityChange.bind(this);
         this.processSource = this.processSource.bind(this);
         this.renderLoader = this.renderLoader.bind(this);
     }
 
     componentWillMount() {
         this._isMounted = true;
-        NetInfo.isConnected.addEventListener('connectionChange', this.handleConnectivityChange);
-        // initial
-        NetInfo.isConnected.fetch()
-            .then(isConnected => {
-                this.safeSetState({
-                    networkAvailable: isConnected
+        this.connectionChange = NetInfo.addEventListener(connectionInfo => {
+            this.safeSetState({
+                    networkAvailable: connectionInfo.isConnected
                 });
-            });
-
+        });
+    
         this.processSource(this.props.source);
     }
 
     componentWillUnmount() {
         this._isMounted = false;
-        NetInfo.isConnected.removeEventListener('connectionChange', this.handleConnectivityChange);
+        this.connectionChange();
     }
 
     componentWillReceiveProps(nextProps) {
@@ -115,11 +110,9 @@ class CachedImage extends React.Component {
     }
 
     getImageCacheManager() {
-        // try to get ImageCacheManager from context
         if (this.context && this.context.getImageCacheManager) {
             return this.context.getImageCacheManager();
         }
-        // create a new one if context is not available
         const options = this.getImageCacheManagerOptions();
         return ImageCacheManager(options);
     }
@@ -129,12 +122,6 @@ class CachedImage extends React.Component {
             return;
         }
         return this.setState(newState);
-    }
-
-    handleConnectivityChange(isConnected) {
-        this.safeSetState({
-            networkAvailable: isConnected
-        });
     }
 
     processSource(source) {
